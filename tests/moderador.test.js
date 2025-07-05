@@ -5,36 +5,36 @@ describe('Moderación de mensajes (mock de Redis)', () => {
   let mensajeBloqueado;
 
   beforeAll(() => {
-    // Simula un cliente Redis suscriptor que recibe un mensaje con una palabra prohibida
     const mockSubscriber = {
       connect: jest.fn(),
       subscribe: jest.fn((canal, callback) => {
         if (canal === 'mensaje_chat') {
-          const mensaje = 'Esto contiene droga';
-          // Aquí simulamos manualmente el filtro como en el código real
-          if (mensaje.toLowerCase().includes('droga')) {
-            mensajeBloqueado = 'Mensaje bloqueado por contenido ofensivo';
-          } else {
-            mensajeBloqueado = mensaje;
-          }
+          callback('Esto contiene droga');
         }
-      }),
+      })
     };
 
     const mockPublisher = {
       connect: jest.fn(),
-      publish: jest.fn()
+      publish: jest.fn((canal, mensaje) => {
+        if (canal === 'moderacion_resultado') {
+          mensajeBloqueado = mensaje;
+        }
+      })
     };
 
     redis.createClient
-      .mockReturnValueOnce(mockSubscriber)
-      .mockReturnValueOnce(mockPublisher);
+      .mockReturnValueOnce(mockSubscriber)  // para subscriber
+      .mockReturnValueOnce(mockPublisher); // para publisher
 
-    require('../services/moderationService'); // Ejecuta el código que se suscribe
+    require('../server'); // importa tu lógica real que conecta redis y modera
   });
 
-  test('Debe bloquear un mensaje con palabra prohibida', () => {
-    expect(mensajeBloqueado).toBe('Mensaje bloqueado por contenido ofensivo');
+  test('Debe bloquear un mensaje con palabra prohibida', (done) => {
+    // Esperar un momento para que se dispare el callback
+    setTimeout(() => {
+      expect(mensajeBloqueado).toBe('Mensaje bloqueado por contenido ofensivo');
+      done(); // finaliza el test correctamente
+    }, 50); // tiempo suficiente para ejecutar el callback
   });
 });
-
