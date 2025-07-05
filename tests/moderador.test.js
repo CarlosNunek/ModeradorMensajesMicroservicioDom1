@@ -5,18 +5,14 @@ describe('Moderación de mensajes (mock de Redis)', () => {
   let mensajeBloqueado;
 
   beforeAll(async () => {
+    // Mock de funciones
     const mockSubscriber = {
-      connect: jest.fn().mockResolvedValue(), // ✅ ahora devuelve una promesa
-      subscribe: jest.fn((canal, callback) => {
-        if (canal === 'chat-eventos') {
-          const mensaje = JSON.stringify({ mensaje: 'Esto contiene droga' });
-          callback(mensaje);
-        }
-      }),
+      connect: jest.fn().mockResolvedValue(),
+      subscribe: jest.fn()
     };
 
     const mockPublisher = {
-      connect: jest.fn().mockResolvedValue(), // ✅ ahora devuelve una promesa
+      connect: jest.fn().mockResolvedValue(),
       publish: jest.fn((canal, mensaje) => {
         if (canal === 'moderacion_resultado') {
           mensajeBloqueado = mensaje;
@@ -24,17 +20,24 @@ describe('Moderación de mensajes (mock de Redis)', () => {
       }),
     };
 
+    // El orden es importante: el primer createClient es el subscriber, el segundo el publisher
     redis.createClient
-      .mockReturnValueOnce(mockSubscriber) // subscriber
-      .mockReturnValueOnce(mockPublisher); // publisher
+      .mockReturnValueOnce(mockSubscriber)
+      .mockReturnValueOnce(mockPublisher);
 
-    require('../server'); // carga la lógica real
+    // Requiere el servidor que usará los mocks ya definidos
+    require('../server');
+
+    // Simula un mensaje recibido desde Redis
+    await mockSubscriber.connect();
+    const mensajePrueba = JSON.stringify({ mensaje: 'Esto contiene droga' });
+
+    // Llama manualmente al callback simulado
+    const subscriberCallback = mockSubscriber.subscribe.mock.calls[0][1];
+    subscriberCallback(mensajePrueba);
   });
 
-  test('Debe bloquear un mensaje con palabra prohibida', (done) => {
-    setTimeout(() => {
-      expect(mensajeBloqueado).toBe('Mensaje bloqueado por contenido ofensivo');
-      done();
-    }, 50);
+  test('Debe bloquear un mensaje con palabra prohibida', () => {
+    expect(mensajeBloqueado).toBe('Mensaje bloqueado por contenido ofensivo');
   });
 });
