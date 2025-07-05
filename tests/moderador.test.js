@@ -2,42 +2,38 @@ const redis = require('redis');
 jest.mock('redis');
 
 describe('Moderación de mensajes (mock de Redis)', () => {
-  let mensajeBloqueado;
+  let mensajeModerado;
 
   beforeAll(async () => {
-    // Mock de funciones
+    // Mock del console.log
+    console.log = jest.fn((msg) => {
+      mensajeModerado = msg;
+    });
+
+    let callbackSubs;
+
     const mockSubscriber = {
       connect: jest.fn().mockResolvedValue(),
-      subscribe: jest.fn()
-    };
-
-    const mockPublisher = {
-      connect: jest.fn().mockResolvedValue(),
-      publish: jest.fn((canal, mensaje) => {
-        if (canal === 'moderacion_resultado') {
-          mensajeBloqueado = mensaje;
-        }
+      subscribe: jest.fn((canal, callback) => {
+        callbackSubs = callback;
       }),
     };
 
-    // El orden es importante: el primer createClient es el subscriber, el segundo el publisher
-    redis.createClient
-      .mockReturnValueOnce(mockSubscriber)
-      .mockReturnValueOnce(mockPublisher);
+    redis.createClient.mockReturnValueOnce(mockSubscriber);
 
-    // Requiere el servidor que usará los mocks ya definidos
     require('../server');
 
-    // Simula un mensaje recibido desde Redis
-    await mockSubscriber.connect();
-    const mensajePrueba = JSON.stringify({ mensaje: 'Esto contiene droga' });
+    const mensajeSimulado = JSON.stringify({
+      tipo: 'mensaje_enviado',
+      contenido: 'esto tiene droga',
+    });
 
-    // Llama manualmente al callback simulado
-    const subscriberCallback = mockSubscriber.subscribe.mock.calls[0][1];
-    subscriberCallback(mensajePrueba);
+    await mockSubscriber.connect();
+    callbackSubs(mensajeSimulado);
   });
 
   test('Debe bloquear un mensaje con palabra prohibida', () => {
-    expect(mensajeBloqueado).toBe('Mensaje bloqueado por contenido ofensivo');
+    expect(mensajeModerado).toContain('bloqueado');
+    expect(mensajeModerado).toContain('droga');
   });
 });
