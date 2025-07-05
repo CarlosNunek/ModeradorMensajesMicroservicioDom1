@@ -25,7 +25,7 @@ describe('Moderación de mensajes (mock de Redis)', () => {
       .mockReturnValueOnce(mockSubscriber)
       .mockReturnValueOnce(mockPublisher);
 
-    require('../moderador'); // o '../src/moderador.js' según tu estructura real
+    require('../services/moderationService'); // o '../src/moderador.js' según tu estructura real
   });
 
   test('Debe bloquear un mensaje con palabra prohibida', () => {
